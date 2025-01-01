@@ -7,11 +7,14 @@ module.exports = {
     if (!queue) {
       return message.channel.send(`${client.emotes.error} | Hermanito mio, no hay na en la lista`)
     }
+    if (queue.songs.length <= 1) {
+      return message.channel.send(`${client.emotes.error} | No hay más canciones en la lista`)
+    }
     try {
-      const song = await queue.skip()
-      message.channel.send(`${client.emotes.success} | Skipeada, Poniendo:\n${song.name}`)
+      await queue.skip()
+      message.channel.send(`${client.emotes.success} | Canción saltada`)
     } catch (e) {
-      message.channel.send(`${client.emotes.error} | No hay mas compita`)
+      message.channel.send(`${client.emotes.error} | Error al intentar saltar la canción`)
     }
   }
 }

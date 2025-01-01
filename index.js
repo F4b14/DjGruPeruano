@@ -1,8 +1,7 @@
 const { DisTube } = require('distube')
-const Discord = require('discord.js')
+const { Client, GatewayIntentBits, Collection, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js')
 const fs = require('fs')
 const config = require('./config.json')
-const { SpotifyPlugin } = require('@distube/spotify')
 const { SoundCloudPlugin } = require('@distube/soundcloud')
 const { YtDlpPlugin } = require('@distube/yt-dlp')
 const { setTimeout } = require('timers/promises');
@@ -13,12 +12,12 @@ Seteamos los intents, osea que chucha espera discord que
 haga el bot en temas de api
 ver canales, mensajes, voice etc
 */
-const client = new Discord.Client({
+const client = new Client({
   intents: [
-    Discord.GatewayIntentBits.Guilds,
-    Discord.GatewayIntentBits.GuildMessages,
-    Discord.GatewayIntentBits.GuildVoiceStates,
-    Discord.GatewayIntentBits.MessageContent
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.MessageContent
   ]
 })
 
@@ -27,8 +26,8 @@ const client = new Discord.Client({
 unas configs del cliente, que en este caso seria el bot
 obviamente
 */
-client.commands = new Discord.Collection()
-client.aliases = new Discord.Collection()
+client.commands = new Collection()
+client.aliases = new Collection()
 client.emotes = config.emoji          // **TO DO** buscar algo mejor?
 client.config = require('./config.json')
 client.distube = new DisTube(client, {
@@ -37,9 +36,6 @@ client.distube = new DisTube(client, {
   emitAddSongWhenCreatingQueue: false,
   emitAddListWhenCreatingQueue: false,
   plugins: [
-    new SpotifyPlugin({
-      emitEventsAfterFetching: true
-    }),
     new SoundCloudPlugin(),
     new YtDlpPlugin()
   ]
@@ -107,25 +103,63 @@ client.on('messageCreate', async message => {
     }
 })
 
+// Añadir manejadores de eventos para los botones
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isButton()) return;
+
+  const queue = client.distube.getQueue(interaction.message);
+  if (!queue) return interaction.reply({ content: `${client.emotes.error} | No hay nada reproduciéndose`, ephemeral: true });
+
+  switch (interaction.customId) {
+    case 'play_button':
+      if (queue.paused) {
+        queue.resume();
+      }
+      break;
+    case 'pause_button':
+      if (!queue.paused) {
+        queue.pause();
+      }
+      break;
+    case 'skip_button':
+      if (queue.songs.length > 1) {
+        queue.skip();
+      }
+      break;
+  }
+
+  await interaction.deferUpdate(); // Indicar que la interacción ha sido recibida
+})
+
 //Distube
 
-/*const status = queue =>
-  `Volumen: \`${queue.volume}%\` | Filtro: \`${queue.filters.names.join(', ') || 'Off'}\` | Loop: \`${
-    queue.repeatMode ? (queue.repeatMode === 2 ? 'All Queue' : 'This Song') : 'Off'
-  }\` | Autoplay: \`${queue.autoplay ? 'On' : 'Off'}\``
-*/
-
 const status = queue =>
-  `Loop: \`${queue.repeatMode ? (queue.repeatMode === 2 ? 'All Queue' : 'This Song') : 'Off'  //Creando el mensaje
-  }\` | Autoplay: \`${queue.autoplay ? 'On' : 'Off'}\``
+  `Loop: \`${queue.repeatMode ? (queue.repeatMode === 2 ? 'All Queue' : 'This Song') : 'Off'}\` | Autoplay: \`${queue.autoplay ? 'On' : 'Off'}\``
 client.distube
-  .on('playSong', (queue, song) =>
-    queue.textChannel.send( 
-      `${client.emotes.play} | Poniendo \`${song.name}\` - \`${song.formattedDuration}\`\nDe parte de: ${
-        song.user           //playSong de distube crea cosas bonitas
-      }\n${status(queue)}`
-    )
-  )
+  .on('playSong', (queue, song) => {
+    const playButton = new ButtonBuilder()
+      .setCustomId('play_button')
+      .setLabel('Play')
+      .setStyle(ButtonStyle.Success);
+
+    const pauseButton = new ButtonBuilder()
+      .setCustomId('pause_button')
+      .setLabel('Pause')
+      .setStyle(ButtonStyle.Danger);
+
+    const skipButton = new ButtonBuilder()
+      .setCustomId('skip_button')
+      .setLabel('Skip')
+      .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder()
+      .addComponents(playButton, pauseButton, skipButton);
+
+    queue.textChannel.send({
+      content: `${client.emotes.play} | Poniendo \`${song.name}\` - \`${song.formattedDuration}\`\nDe parte de: ${song.user}\n${status(queue)}`,
+      components: [row]
+    });
+  })
   .on('addSong', (queue, song) =>
     queue.textChannel.send(
       `${client.emotes.success} | Agregando ${song.name} - \`${song.formattedDuration}\` a la lista, gracias a: ${song.user}`
