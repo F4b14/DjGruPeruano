@@ -176,11 +176,23 @@ client.distube
     if (channel) channel.send(`${client.emotes.error} | Error: ${e.toString().slice(0, 1974)}`)
     else console.error(e)       //Lo mismo pero mas fallado
   })
-  //.on('empty', channel => channel.send('Voice channel is empty! Leaving the channel...')) codigo pa que el bot se vaya, lo cual no queremos
-  .on('searchNoResult', (message, query) =>
-    message.channel.send(`${client.emotes.error} | No encontre \`${query}\``)
-  )
   .on('finish', queue => queue.textChannel.send('No quedan mah!'))
+  .on('empty', channel => channel.send('El canal de voz está vacío, saliendo del canal...'))
+  .on('searchNoResult', (message, query) =>
+    message.channel.send(`${client.emotes.error} | No encontré resultados para \`${query}\``)
+  )
+  .on('searchResult', (message, result) => {
+    let i = 0;
+    message.channel.send(
+      `**Elige una opción de abajo**\n${result
+        .map(song => `**${++i}**. ${song.name} - \`${song.formattedDuration}\``)
+        .join("\n")}\n*Ingresa cualquier otra cosa o espera 60 segundos para cancelar*`
+    );
+  })
+  .on('searchCancel', message => message.channel.send(`${client.emotes.error} | Búsqueda cancelada`))
+  .on('searchInvalidAnswer', message =>
+    message.channel.send(`${client.emotes.error} | Respuesta inválida! Debes ingresar el número dentro del rango de los resultados`)
+  );
 
 //Si no lo miro no es ilegal dijo el homero
 
